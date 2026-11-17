@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <!--
+    Virtus · Almoxarifado — app (PWA) que abre o sistema do Apps Script em tela cheia.
+
+    >>> ÚNICA COISA PARA CONFIGURAR: o endereço do sistema, logo abaixo, em URL_SISTEMA.
+        É o link que termina em /exec (Apps Script → Implantar → Gerenciar implantações).
+        O link não muda quando você publica novas versões, então só configura uma vez.
+  -->
+  <script>
+    const URL_SISTEMA = 'https://script.google.com/a/macros/virtusecc.com.br/s/AKfycbwcMAZhzotQ1LorFkgdkEz6oO4rQCUFIYriuiL54Larph6n0JEELJPDfO2QccRMhLQL/exec';
+  </script>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Virtus · Almoxarifado</title>
+  <meta name="description" content="Sistema de Almoxarifado da Virtus Escola Cristã Clássica">
+  <meta name="theme-color" content="#5B0C19">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Almoxarifado">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <style>
+    :root{ --vinho:#5B0C19; --vinho-escuro:#3C0710; --creme:#F1E9D8; --dourado:#CDAA62; }
+    html, body{ margin:0; height:100%; background:var(--vinho); overflow:hidden; }
+    body{
+      font-family: 'EB Garamond', Garamond, Georgia, serif;
+      /* No iPhone com o app instalado, a barra de status fica sobre o app: reserva o espaço. */
+      padding-top: env(safe-area-inset-top);
+      box-sizing: border-box;
+    }
+    #sistema{
+      position: absolute; left:0; right:0; bottom:0; top: env(safe-area-inset-top);
+      width:100%; height: calc(100% - env(safe-area-inset-top));
+      border:0; background:#F4F4F4;
+    }
+
+    /* Tela de abertura (some quando o sistema termina de carregar) */
+    #abertura{
+      position:fixed; inset:0; z-index:5; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:28px;
+      background: radial-gradient(ellipse at 50% 35%, #6E1424 0%, var(--vinho) 45%, var(--vinho-escuro) 100%);
+      color: var(--creme); transition: opacity .35s ease;
+    }
+    #abertura.saindo{ opacity:0; pointer-events:none; }
+    #abertura img{ width:min(52vw, 230px); height:auto; }
+    #abertura p{ margin:0; font-size:15px; letter-spacing:.14em; text-transform:uppercase; color:rgba(241,233,216,.75); }
+    .pontos{ display:flex; gap:7px; }
+    .pontos i{ width:7px; height:7px; border-radius:50%; background:var(--dourado); opacity:.35; animation: pulsar 1.2s infinite ease-in-out; }
+    .pontos i:nth-child(2){ animation-delay:.2s; } .pontos i:nth-child(3){ animation-delay:.4s; }
+    @keyframes pulsar{ 0%,100%{ opacity:.25; transform:scale(.85);} 50%{ opacity:1; transform:scale(1);} }
+    @media (prefers-reduced-motion: reduce){ .pontos i{ animation:none; opacity:.8; } #abertura{ transition:none; } }
+
+    /* Mensagens (sem internet / demorando / não configurado) */
+    #aviso{ display:none; max-width:320px; text-align:center; font-size:16px; line-height:1.45; color:var(--creme); padding:0 20px; }
+    #aviso strong{ display:block; font-size:19px; color:#fff; margin-bottom:6px; font-weight:500; }
+    #aviso button{ margin-top:16px; border:1px solid var(--dourado); background:transparent; color:var(--creme); border-radius:22px; padding:10px 22px; font:inherit; font-size:15px; cursor:pointer; }
+
+    /* Dica de instalação (só aparece no navegador, nunca dentro do app instalado) */
+    #instalar{
+      position:fixed; left:12px; right:12px; bottom: calc(12px + env(safe-area-inset-bottom)); z-index:6; display:none;
+      align-items:center; gap:12px; padding:12px 14px; border-radius:14px; background:#fff; color:#231F20;
+      box-shadow:0 10px 30px rgba(0,0,0,.25); font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; font-size:14px; line-height:1.35;
+    }
+    #instalar img{ width:40px; height:40px; border-radius:9px; flex-shrink:0; }
+    #instalar div{ flex:1; min-width:0; }
+    #instalar b{ display:block; color:var(--vinho); }
+    #instalar button{ border:0; border-radius:18px; padding:8px 14px; font:inherit; font-weight:600; cursor:pointer; }
+    #btnInstalar{ background:var(--vinho); color:#fff; }
+    #btnFecharDica{ background:transparent; color:#777; padding:8px 6px !important; font-size:20px !important; line-height:1; }
+  </style>
+</head>
+<body>
+  <div id="abertura" role="status" aria-live="polite">
+    <img src="icons/logo-abertura.png" alt="Virtus Escola Cristã Clássica">
+    <p id="textoAbertura">Almoxarifado</p>
+    <div class="pontos" id="pontos" aria-hidden="true"><i></i><i></i><i></i></div>
+    <div id="aviso"></div>
+  </div>
+
+  <iframe id="sistema" title="Sistema de Almoxarifado da Virtus"
+          allow="camera; clipboard-read; clipboard-write; fullscreen; geolocation"></iframe>
+
+  <div id="instalar" role="dialog" aria-label="Instalar o app">
+    <img src="icons/icon-192.png" alt="">
+    <div id="textoInstalar"></div>
+    <button id="btnInstalar" style="display:none;">Instalar</button>
+    <button id="btnFecharDica" aria-label="Fechar">×</button>
+  </div>
+
+  <script>
+    (function(){
+      const abertura = document.getElementById('abertura');
+      const aviso = document.getElementById('aviso');
+      const pontos = document.getElementById('pontos');
+      const frame = document.getElementById('sistema');
+      let carregou = false, timerLento = null;
+
+      function mostrarAviso(titulo, texto, comBotao){
+        pontos.style.display = 'none';
+        aviso.style.display = 'block';
+        aviso.innerHTML = '<strong>' + titulo + '</strong>' + texto +
+          (comBotao ? '<br><button type="button" id="btnTentar">Tentar de novo</button>' : '');
+        const b = document.getElementById('btnTentar');
+        if (b) b.addEventListener('click', function(){ location.reload(); });
+      }
+
+      function esconderAbertura(){
+        carregou = true;
+        clearTimeout(timerLento);
+        abertura.classList.add('saindo');
+        setTimeout(function(){ abertura.style.display = 'none'; }, 400);
+      }
+
+      if (!/^https:\/\/script\.google(usercontent)?\.com\//.test(URL_SISTEMA)){
+        mostrarAviso('App ainda não configurado', 'Abra o arquivo index.html e cole o link do sistema (o que termina em /exec) em URL_SISTEMA.', false);
+      } else if (!navigator.onLine){
+        mostrarAviso('Sem conexão com a internet', 'O sistema precisa de internet para funcionar. Verifique o Wi-Fi ou os dados móveis.', true);
+      } else {
+        frame.addEventListener('load', esconderAbertura);
+        frame.src = URL_SISTEMA;
+        // O Apps Script às vezes demora para "acordar": avisa em vez de parecer travado.
+        timerLento = setTimeout(function(){
+          if (carregou) return;
+          mostrarAviso('Está demorando mais que o normal…', 'O servidor do Google pode estar lento. Aguarde mais um pouco ou tente de novo.', true);
+        }, 20000);
+      }
+
+      window.addEventListener('offline', function(){
+        abertura.style.display = 'flex'; abertura.classList.remove('saindo');
+        mostrarAviso('Sem conexão com a internet', 'Assim que a conexão voltar, toque em "Tentar de novo".', true);
+      });
+
+      // ---- Service worker: deixa o app instalável e abre a tela de abertura mesmo offline
+      if ('serviceWorker' in navigator){
+        window.addEventListener('load', function(){ navigator.serviceWorker.register('sw.js').catch(function(){}); });
+      }
+
+      // ---- Dica de instalação
+      const jaInstalado = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+      let dispensou = false;
+      try { dispensou = localStorage.getItem('virtus_dica_instalar') === 'nao'; } catch (e) {}
+      const caixa = document.getElementById('instalar');
+      const texto = document.getElementById('textoInstalar');
+      const btnInstalar = document.getElementById('btnInstalar');
+      document.getElementById('btnFecharDica').addEventListener('click', function(){
+        caixa.style.display = 'none';
+        try { localStorage.setItem('virtus_dica_instalar', 'nao'); } catch (e) {}
+      });
+
+      if (!jaInstalado && !dispensou){
+        const ehIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        if (ehIOS){
+          texto.innerHTML = '<b>Instale o app do Almoxarifado</b>Toque em <span aria-label="Compartilhar">Compartilhar ⬆︎</span> e depois em <b style="display:inline;">Adicionar à Tela de Início</b>.';
+          setTimeout(function(){ caixa.style.display = 'flex'; }, 2500);
+        }
+        // Android / Chrome / Edge: o navegador avisa quando dá para instalar.
+        let pedido = null;
+        window.addEventListener('beforeinstallprompt', function(e){
+          e.preventDefault();
+          pedido = e;
+          texto.innerHTML = '<b>Instale o app do Almoxarifado</b>Abre direto, em tela cheia, com o ícone da Virtus.';
+          btnInstalar.style.display = 'inline-block';
+          caixa.style.display = 'flex';
+        });
+        btnInstalar.addEventListener('click', function(){
+          if (!pedido) return;
+          pedido.prompt();
+          pedido.userChoice.finally(function(){ pedido = null; caixa.style.display = 'none'; });
+        });
+        window.addEventListener('appinstalled', function(){ caixa.style.display = 'none'; });
+      }
+    })();
+  </script>
+</body>
+</html>
