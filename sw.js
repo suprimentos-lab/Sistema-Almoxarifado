@@ -3,7 +3,7 @@
 // e abrir mesmo sem internet mostrando o aviso de conexão. O sistema em si
 // (Apps Script) NUNCA é guardado aqui: sempre vem atualizado do Google.
 // Ao mudar algum arquivo do app, aumente o número da versão abaixo.
-const VERSAO = 'virtus-almox-v1';
+const VERSAO = 'virtus-almox-v2';
 const CASCA = [
   './',
   './index.html',
